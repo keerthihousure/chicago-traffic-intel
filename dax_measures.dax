@@ -1,0 +1,142 @@
+-- ============================================================
+-- Chicago Traffic Intelligence Platform
+-- DAX Measures for Power BI Desktop
+-- ============================================================
+
+-- ── KPI CARD MEASURES ─────────────────────────────────────
+
+Total Vehicle Trips =
+SUM(traffic_records[traffic_volume])
+
+Network Avg Speed =
+AVERAGE(traffic_records[avg_speed_mph])
+
+Network Avg TTI =
+AVERAGE(traffic_records[travel_time_index])
+
+Total Incidents =
+SUMX(traffic_records, traffic_records[has_incident])
+
+Incident Rate % =
+DIVIDE(
+    [Total Incidents],
+    COUNTROWS(traffic_records),
+    0
+) * 100
+
+Corridors Monitored =
+DISTINCTCOUNT(traffic_records[corridor])
+
+-- ── PEAK HOUR MEASURES ────────────────────────────────────
+
+Peak Hour Volume =
+CALCULATE(
+    [Total Vehicle Trips],
+    traffic_records[is_peak_hour] = 1
+)
+
+Peak TTI =
+CALCULATE(
+    AVERAGE(traffic_records[travel_time_index]),
+    traffic_records[is_peak_hour] = 1
+)
+
+Off Peak TTI =
+CALCULATE(
+    AVERAGE(traffic_records[travel_time_index]),
+    traffic_records[is_peak_hour] = 0
+)
+
+Peak vs OffPeak TTI Ratio =
+DIVIDE([Peak TTI], [Off Peak TTI], 1)
+
+-- ── WEATHER IMPACT ────────────────────────────────────────
+
+Speed in Clear Weather =
+CALCULATE(
+    AVERAGE(traffic_records[avg_speed_mph]),
+    traffic_records[weather_condition] = "Clear"
+)
+
+Speed in Snow =
+CALCULATE(
+    AVERAGE(traffic_records[avg_speed_mph]),
+    traffic_records[weather_condition] = "Snow"
+)
+
+Snow Speed Reduction % =
+DIVIDE(
+    [Speed in Clear Weather] - [Speed in Snow],
+    [Speed in Clear Weather],
+    0
+) * 100
+
+-- ── WEEKEND vs WEEKDAY ────────────────────────────────────
+
+Weekday Avg Volume =
+CALCULATE(
+    AVERAGE(traffic_records[traffic_volume]),
+    traffic_records[is_weekend] = 0
+)
+
+Weekend Avg Volume =
+CALCULATE(
+    AVERAGE(traffic_records[traffic_volume]),
+    traffic_records[is_weekend] = 1
+)
+
+Weekend Pct of Weekday =
+DIVIDE([Weekend Avg Volume], [Weekday Avg Volume], 0) * 100
+
+-- ── DYNAMIC TITLE (used in chart headers) ────────────────
+
+Selected Corridor Title =
+VAR sel = SELECTEDVALUE(traffic_records[corridor], "All Corridors")
+RETURN "Traffic Analysis — " & sel
+
+-- ── TIME INTELLIGENCE (requires a Date table) ────────────
+
+Volume MoM Change % =
+VAR CurrentMonth = [Total Vehicle Trips]
+VAR PriorMonth =
+    CALCULATE(
+        [Total Vehicle Trips],
+        DATEADD('Date'[Date], -1, MONTH)
+    )
+RETURN
+DIVIDE(CurrentMonth - PriorMonth, PriorMonth, 0) * 100
+
+Volume YTD =
+TOTALYTD([Total Vehicle Trips], 'Date'[Date])
+
+Rolling 3-Month Avg Volume =
+AVERAGEX(
+    DATESINPERIOD('Date'[Date], LASTDATE('Date'[Date]), -3, MONTH),
+    [Total Vehicle Trips]
+)
+
+-- ── CONGESTION CLASSIFICATION ─────────────────────────────
+
+Congestion Level =
+VAR tti = [Network Avg TTI]
+RETURN
+SWITCH(
+    TRUE(),
+    tti < 1.10, "Free Flow",
+    tti < 1.30, "Moderate",
+    tti < 1.60, "Congested",
+    "Severely Congested"
+)
+
+-- ── CONDITIONAL FORMATTING VALUES ─────────────────────────
+
+TTI Color Value =
+VAR tti = [Network Avg TTI]
+RETURN
+SWITCH(
+    TRUE(),
+    tti < 1.10, 1,   -- Green
+    tti < 1.30, 2,   -- Yellow
+    tti < 1.60, 3,   -- Orange
+    4                 -- Red
+)

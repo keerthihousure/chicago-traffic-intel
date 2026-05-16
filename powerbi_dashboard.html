@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Chicago Traffic Intelligence Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Segoe UI', sans-serif;
+    background: #1a1f2e;
+    color: #e2e8f0;
+    min-height: 100vh;
+  }
+
+  /* ── Header ─────────────────────────────────────────── */
+  .header {
+    background: #141824;
+    border-bottom: 1px solid #2d3748;
+    padding: 12px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .header-left { display: flex; align-items: center; gap: 16px; }
+  .pbi-logo {
+    background: linear-gradient(135deg, #F2C811, #E6A500);
+    width: 32px; height: 32px; border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 900; font-size: 13px; color: #1a1200;
+  }
+  .header-title { font-size: 16px; font-weight: 600; color: #f0f4f8; }
+  .header-sub   { font-size: 11px; color: #718096; margin-top: 1px; }
+  .header-right { display: flex; align-items: center; gap: 12px; }
+  .badge {
+    background: #00d4aa22;
+    color: #00d4aa;
+    border: 1px solid #00d4aa44;
+    border-radius: 4px;
+    padding: 3px 10px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: .5px;
+  }
+  .last-refresh { font-size: 11px; color: #718096; }
+
+  /* ── Canvas ─────────────────────────────────────────── */
+  .canvas {
+    padding: 18px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  /* ── Slicer row ──────────────────────────────────────── */
+  .slicer-bar {
+    background: #141824;
+    border: 1px solid #2d3748;
+    border-radius: 6px;
+    padding: 8px 16px;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    flex-wrap: wrap;
+  }
+  .slicer-label { font-size: 10px; color: #718096; text-transform: uppercase; letter-spacing: .8px; }
+  .slicer-chips { display: flex; gap: 6px; flex-wrap: wrap; }
+  .chip {
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    border: 1px solid transparent;
+  }
+  .chip-active  { background: #0079c1; color: #fff; }
+  .chip-inactive{ background: #1e2536; color: #94a3b8; border-color: #2d3748; }
+  .slicer-sep   { width: 1px; height: 24px; background: #2d3748; }
+
+  /* ── KPI row ─────────────────────────────────────────── */
+  .kpi-row {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 10px;
+  }
+  .kpi-card {
+    background: #1e2536;
+    border: 1px solid #2d3748;
+    border-radius: 8px;
+    padding: 12px 16px;
+    position: relative;
+    overflow: hidden;
+  }
+  .kpi-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    border-radius: 8px 8px 0 0;
+  }
+  .kpi-blue::before   { background: #0079c1; }
+  .kpi-green::before  { background: #00d4aa; }
+  .kpi-amber::before  { background: #f6ad55; }
+  .kpi-red::before    { background: #fc8181; }
+  .kpi-purple::before { background: #9f7aea; }
+
+  .kpi-label  { font-size: 10px; color: #718096; text-transform: uppercase; letter-spacing: .7px; margin-bottom: 6px; }
+  .kpi-value  { font-size: 22px; font-weight: 700; color: #f0f4f8; line-height: 1; }
+  .kpi-sub    { font-size: 10px; color: #718096; margin-top: 4px; }
+  .kpi-delta  { font-size: 11px; margin-top: 4px; font-weight: 600; }
+  .delta-pos  { color: #00d4aa; }
+  .delta-neg  { color: #fc8181; }
+
+  /* ── Main grid ───────────────────────────────────────── */
+  .main-grid {
+    display: grid;
+    grid-template-columns: 1.4fr 1fr;
+    gap: 14px;
+  }
+  .bottom-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 14px;
+  }
+
+  /* ── Chart cards ─────────────────────────────────────── */
+  .chart-card {
+    background: #1e2536;
+    border: 1px solid #2d3748;
+    border-radius: 8px;
+    padding: 14px 16px;
+  }
+  .chart-title {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .7px;
+    color: #94a3b8;
+    margin-bottom: 3px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .chart-subtitle { font-size: 10px; color: #4a5568; margin-bottom: 12px; }
+  .chart-area { position: relative; }
+
+  /* ── Map placeholder ─────────────────────────────────── */
+  .map-card {
+    background: #1e2536;
+    border: 1px solid #2d3748;
+    border-radius: 8px;
+    padding: 14px 16px;
+  }
+  .map-bg {
+    background: #141824;
+    border-radius: 6px;
+    height: 200px;
+    position: relative;
+    overflow: hidden;
+    border: 1px solid #2d3748;
+  }
+  /* Chicago street grid dots */
+  .map-bg::before {
+    content: '';
+    position: absolute; inset: 0;
+    background-image:
+      radial-gradient(circle, #2d3748 1px, transparent 1px);
+    background-size: 18px 18px;
+    opacity: .5;
+  }
+  /* Lake outline */
+  .map-bg::after {
+    content: '';
+    position: absolute;
+    right: 0; top: 0;
+    width: 28%;
+    height: 100%;
+    background: #0c1829;
+    border-left: 1px solid #1e4a7a44;
+    clip-path: polygon(20% 0, 100% 0, 100% 100%, 0 100%);
+  }
+  .map-label {
+    position: absolute;
+    right: 8px; top: 8px;
+    font-size: 8px;
+    color: #2d6a9f;
+    letter-spacing: .5px;
+    text-transform: uppercase;
+    z-index: 2;
+  }
+  /* Hot spots */
+  .hotspot {
+    position: absolute;
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+  }
+
+  /* ── Weather table ───────────────────────────────────── */
+  .wx-table { width: 100%; border-collapse: collapse; font-size: 11px; }
+  .wx-table th { color: #4a5568; font-weight: 600; text-align: left; padding: 4px 0; border-bottom: 1px solid #2d3748; font-size: 10px; text-transform: uppercase; letter-spacing: .5px; }
+  .wx-table td { padding: 5px 0; border-bottom: 1px solid #1a1f2e; color: #94a3b8; }
+  .wx-table td:last-child { text-align: right; }
+  .bar-cell { display: flex; align-items: center; gap: 6px; }
+  .mini-bar { height: 5px; border-radius: 3px; background: #0079c1; }
+
+  /* ── Footer ─────────────────────────────────────────── */
+  .footer {
+    padding: 6px 20px 10px;
+    font-size: 10px;
+    color: #4a5568;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  /* ── Legend ──────────────────────────────────────────── */
+  .legend { display: flex; gap: 12px; flex-wrap: wrap; }
+  .legend-item { display: flex; align-items: center; gap: 5px; font-size: 10px; color: #718096; }
+  .legend-dot  { width: 8px; height: 8px; border-radius: 2px; }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="header">
+  <div class="header-left">
+    <div class="pbi-logo">PBI</div>
+    <div>
+      <div class="header-title">Chicago Traffic Intelligence Platform</div>
+      <div class="header-sub">Operational Planning Dashboard  ·  FY 2023  ·  500K+ Records</div>
+    </div>
+  </div>
+  <div class="header-right">
+    <div class="badge">LIVE</div>
+    <div class="last-refresh">Last refresh: Dec 30, 2023 11:59 PM</div>
+  </div>
+</div>
+
+<!-- CANVAS -->
+<div class="canvas">
+
+  <!-- SLICERS -->
+  <div class="slicer-bar">
+    <span class="slicer-label">Road Type</span>
+    <div class="slicer-chips">
+      <span class="chip chip-active">All</span>
+      <span class="chip chip-inactive">Highway</span>
+      <span class="chip chip-inactive">Arterial</span>
+    </div>
+    <div class="slicer-sep"></div>
+    <span class="slicer-label">Day Type</span>
+    <div class="slicer-chips">
+      <span class="chip chip-active">All Days</span>
+      <span class="chip chip-inactive">Weekday</span>
+      <span class="chip chip-inactive">Weekend</span>
+    </div>
+    <div class="slicer-sep"></div>
+    <span class="slicer-label">Month</span>
+    <div class="slicer-chips">
+      <span class="chip chip-active">Full Year</span>
+      <span class="chip chip-inactive">Q1</span>
+      <span class="chip chip-inactive">Q2</span>
+      <span class="chip chip-inactive">Q3</span>
+      <span class="chip chip-inactive">Q4</span>
+    </div>
+  </div>
+
+  <!-- KPI ROW -->
+  <div class="kpi-row">
+    <div class="kpi-card kpi-blue">
+      <div class="kpi-label">Total Vehicle Trips</div>
+      <div class="kpi-value">562M</div>
+      <div class="kpi-sub">Annual network throughput</div>
+      <div class="kpi-delta delta-pos">▲ 3.2% YoY</div>
+    </div>
+    <div class="kpi-card kpi-green">
+      <div class="kpi-label">Avg Network Speed</div>
+      <div class="kpi-value">24.7 mph</div>
+      <div class="kpi-sub">All corridors, all hours</div>
+      <div class="kpi-delta delta-neg">▼ 1.8% vs target</div>
+    </div>
+    <div class="kpi-card kpi-amber">
+      <div class="kpi-label">Travel Time Index</div>
+      <div class="kpi-value">1.38</div>
+      <div class="kpi-sub">Peak: 1.89 (AM rush)</div>
+      <div class="kpi-delta delta-neg">▼ Congested (>1.3)</div>
+    </div>
+    <div class="kpi-card kpi-red">
+      <div class="kpi-label">Total Incidents</div>
+      <div class="kpi-value">272K</div>
+      <div class="kpi-sub">54.5% of observations</div>
+      <div class="kpi-delta delta-neg">▲ 4.1% vs prior yr</div>
+    </div>
+    <div class="kpi-card kpi-purple">
+      <div class="kpi-label">Corridors Monitored</div>
+      <div class="kpi-value">20</div>
+      <div class="kpi-sub">365 days · 500K records</div>
+      <div class="kpi-delta delta-pos">▲ 100% coverage</div>
+    </div>
+  </div>
+
+  <!-- MAIN GRID -->
+  <div class="main-grid">
+
+    <!-- Volume heatmap (hour × day) -->
+    <div class="chart-card">
+      <div class="chart-title">
+        Congestion Heatmap — Travel Time Index
+        <div class="legend">
+          <div class="legend-item"><div class="legend-dot" style="background:#1a3a5c;"></div>Low</div>
+          <div class="legend-item"><div class="legend-dot" style="background:#c75a1a;"></div>High</div>
+        </div>
+      </div>
+      <div class="chart-subtitle">Hour of day × Day of week · Weekday peaks shaded</div>
+      <div class="chart-area" style="height:210px">
+        <canvas id="heatmapChart" role="img" aria-label="Heatmap showing travel time index by hour and day of week">Highest congestion on weekday mornings 7-9am and afternoons 4-7pm.</canvas>
+      </div>
+    </div>
+
+    <!-- Geospatial: incident map -->
+    <div class="map-card">
+      <div class="chart-title">Incident Density Map <span style="font-size:9px;color:#4a5568;font-weight:400;text-transform:none;">· Chicago Metro</span></div>
+      <div class="chart-subtitle">Hot-spot clustering · Major corridors highlighted</div>
+      <div class="map-bg">
+        <div class="map-label">Lake Michigan</div>
+        <!-- Major crash clusters as glowing dots -->
+        <div class="hotspot" style="left:60%;top:22%;width:36px;height:36px;background:rgba(252,129,74,.22);border:2px solid rgba(252,129,74,.6);"></div>
+        <div class="hotspot" style="left:55%;top:22%;width:18px;height:18px;background:rgba(252,129,74,.5);"></div>
+        <div class="hotspot" style="left:42%;top:45%;width:44px;height:44px;background:rgba(252,129,74,.18);border:2px solid rgba(252,129,74,.5);"></div>
+        <div class="hotspot" style="left:42%;top:45%;width:18px;height:18px;background:rgba(252,129,74,.5);"></div>
+        <div class="hotspot" style="left:50%;top:60%;width:52px;height:52px;background:rgba(252,129,74,.14);border:2px solid rgba(252,129,74,.4);"></div>
+        <div class="hotspot" style="left:50%;top:60%;width:22px;height:22px;background:rgba(252,129,74,.55);border:2px solid #fc814a;"></div>
+        <div class="hotspot" style="left:30%;top:35%;width:30px;height:30px;background:rgba(0,121,193,.2);border:1px solid rgba(0,121,193,.5);"></div>
+        <div class="hotspot" style="left:30%;top:35%;width:12px;height:12px;background:rgba(0,121,193,.7);"></div>
+        <div class="hotspot" style="left:65%;top:50%;width:28px;height:28px;background:rgba(0,212,170,.18);border:1px solid rgba(0,212,170,.45);"></div>
+        <!-- Corridor lines -->
+        <svg style="position:absolute;inset:0;width:100%;height:100%;" xmlns="http://www.w3.org/2000/svg">
+          <!-- Lake Shore Dr -->
+          <path d="M 62% 5% Q 63% 40% 64% 85%" stroke="#0079c188" stroke-width="2" fill="none" stroke-dasharray="4,3"/>
+          <!-- Dan Ryan -->
+          <path d="M 52% 25% L 50% 85%" stroke="#fc8181aa" stroke-width="2.5" fill="none"/>
+          <!-- Eisenhower -->
+          <path d="M 15% 45% L 70% 44%" stroke="#f6ad55aa" stroke-width="2" fill="none"/>
+        </svg>
+      </div>
+      <!-- Legend -->
+      <div style="display:flex;gap:14px;margin-top:8px;">
+        <div class="legend-item"><div class="legend-dot" style="background:#fc814a;border-radius:50%;"></div>High Incident</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#0079c1;border-radius:50%;"></div>High Volume</div>
+        <div class="legend-item" style="gap:4px;"><div style="width:16px;height:2px;background:#f6ad55;border-radius:1px;"></div>Corridor</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- BOTTOM GRID -->
+  <div class="bottom-grid">
+
+    <!-- Hourly volume line -->
+    <div class="chart-card">
+      <div class="chart-title">Peak-Hour Traffic Volume</div>
+      <div class="chart-subtitle">Avg vehicles per 15-min · Weekday vs Weekend</div>
+      <div class="chart-area" style="height:175px">
+        <canvas id="lineChart" role="img" aria-label="Line chart of hourly traffic volume showing weekday and weekend patterns">Weekday shows peaks at 7-9am and 4-7pm. Weekend is flatter with midday peak.</canvas>
+      </div>
+    </div>
+
+    <!-- Seasonal bar -->
+    <div class="chart-card">
+      <div class="chart-title">Seasonal Volume Trends</div>
+      <div class="chart-subtitle">Monthly avg · Highway vs Arterial</div>
+      <div class="chart-area" style="height:175px">
+        <canvas id="seasonChart" role="img" aria-label="Bar chart of monthly average traffic volume by road type">Summer months July-August show highest volumes. January and February are lowest.</canvas>
+      </div>
+    </div>
+
+    <!-- Weather impact -->
+    <div class="chart-card">
+      <div class="chart-title">Weather Speed Impact</div>
+      <div class="chart-subtitle">Avg speed reduction by condition (mph)</div>
+      <div style="margin-top:10px;">
+        <table class="wx-table">
+          <tr>
+            <th>Condition</th>
+            <th>Avg Speed</th>
+            <th style="text-align:right">Speed Index</th>
+          </tr>
+          <tr>
+            <td>☀ Clear</td>
+            <td><div class="bar-cell"><div class="mini-bar" style="width:90px;background:#00d4aa;"></div>26.4</div></td>
+            <td><span style="color:#00d4aa;font-weight:700;">1.00</span></td>
+          </tr>
+          <tr>
+            <td>☁ Cloudy</td>
+            <td><div class="bar-cell"><div class="mini-bar" style="width:86px;background:#68d391;"></div>25.6</div></td>
+            <td><span style="color:#68d391;">0.97</span></td>
+          </tr>
+          <tr>
+            <td>🌧 Rain</td>
+            <td><div class="bar-cell"><div class="mini-bar" style="width:72px;background:#f6ad55;"></div>22.1</div></td>
+            <td><span style="color:#f6ad55;">0.84</span></td>
+          </tr>
+          <tr>
+            <td>🌫 Fog</td>
+            <td><div class="bar-cell"><div class="mini-bar" style="width:65px;background:#fc8181;"></div>20.0</div></td>
+            <td><span style="color:#fc8181;">0.76</span></td>
+          </tr>
+          <tr>
+            <td>❄ Snow</td>
+            <td><div class="bar-cell"><div class="mini-bar" style="width:52px;background:#e53e3e;"></div>16.5</div></td>
+            <td><span style="color:#e53e3e;font-weight:700;">0.63</span></td>
+          </tr>
+        </table>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- FOOTER -->
+<div class="footer">
+  <span>Data Source: Chicago Open Data Portal · 500,000 Records · Jan–Dec 2023 · SQL + Python ETL · DAX-driven KPIs</span>
+  <span>Chicago Traffic Intelligence Platform · Built with Power BI + Python + SQL</span>
+</div>
+
+<script>
+const BLUE   = '#0079c1';
+const TEAL   = '#00d4aa';
+const AMBER  = '#f6ad55';
+const RED    = '#fc8181';
+const GRID   = '#2d374855';
+const TICK   = '#718096';
+
+// ── Heatmap (matrix via scatter) ──────────────────────────────────────────
+const days  = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+const hours = Array.from({length:24},(_,i)=>i);
+
+const tti = [
+  [0.92,0.88,0.86,0.84,0.90,1.05,1.42,1.82,1.65,1.38,1.28,1.32,1.35,1.30,1.28,1.35,1.55,1.89,1.72,1.48,1.28,1.12,1.02,0.95],
+  [0.90,0.86,0.85,0.83,0.88,1.02,1.38,1.79,1.62,1.35,1.25,1.30,1.32,1.28,1.25,1.32,1.52,1.85,1.68,1.45,1.25,1.10,1.00,0.93],
+  [0.91,0.87,0.85,0.83,0.89,1.03,1.40,1.80,1.63,1.36,1.26,1.31,1.33,1.29,1.26,1.33,1.53,1.87,1.70,1.46,1.26,1.11,1.01,0.94],
+  [0.92,0.88,0.86,0.84,0.90,1.05,1.41,1.81,1.64,1.37,1.27,1.32,1.34,1.30,1.27,1.34,1.54,1.88,1.71,1.47,1.27,1.12,1.02,0.95],
+  [0.94,0.90,0.88,0.86,0.92,1.08,1.45,1.85,1.68,1.41,1.30,1.35,1.38,1.33,1.30,1.38,1.58,1.92,1.75,1.51,1.30,1.15,1.05,0.98],
+  [0.82,0.78,0.76,0.74,0.78,0.88,0.98,1.05,1.12,1.20,1.25,1.28,1.30,1.28,1.26,1.28,1.22,1.15,1.08,1.00,0.95,0.90,0.85,0.82],
+  [0.80,0.76,0.74,0.72,0.76,0.85,0.95,1.02,1.08,1.15,1.20,1.24,1.26,1.24,1.22,1.24,1.18,1.10,1.04,0.97,0.91,0.87,0.82,0.79],
+];
+
+const pts = [];
+const vals = [];
+tti.forEach((row, di) => {
+  row.forEach((v, hi) => {
+    pts.push({x: hi, y: di, v});
+    vals.push(v);
+  });
+});
+const minV = 0.72, maxV = 1.92;
+
+function ttiColor(v) {
+  const t = (v - minV) / (maxV - minV);
+  const r = Math.round(26  + t * (239 - 26));
+  const g = Math.round(58  + t * (68  - 68) + (1-t)*38);
+  const b = Math.round(92  + t * (30  - 92));
+  return `rgb(${r},${Math.round(58*(1-t)+68*t*0.3)},${b})`;
+}
+
+const heatCtx = document.getElementById('heatmapChart').getContext('2d');
+new Chart(heatCtx, {
+  type: 'scatter',
+  data: {
+    datasets: [{
+      data: pts,
+      pointRadius: 7.5,
+      pointStyle: 'rect',
+      backgroundColor: pts.map(p => ttiColor(p.v)),
+      borderWidth: 0,
+    }]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { display: false }, tooltip: {
+      callbacks: {
+        label: ctx => {
+          const p = pts[ctx.dataIndex];
+          return ` ${days[p.y]}  ${String(p.x).padStart(2,'0')}:00 → TTI ${p.v.toFixed(2)}`;
+        }
+      }
+    }},
+    scales: {
+      x: { min: -0.5, max: 23.5, ticks: { callback: v => v%4===0?`${String(v).padStart(2,'0')}h`:'', color: TICK, font:{size:9} }, grid:{color:GRID} },
+      y: { min: -0.5, max: 6.5, ticks: { callback: v => Number.isInteger(v)?days[v]:'', color: TICK, font:{size:9} }, grid:{color:GRID} }
+    }
+  }
+});
+
+// ── Hourly volume line ────────────────────────────────────────────────────
+const lineCtx = document.getElementById('lineChart').getContext('2d');
+const wdVol = [420,310,248,232,360,780,1340,1820,1660,1420,1310,1380,1450,1380,1330,1410,1620,1900,1740,1520,1280,1050,810,580];
+const weVol = [310,240,195,185,240,420,680,920,1050,1180,1250,1340,1380,1350,1320,1350,1280,1180,1080,980,850,720,580,420];
+
+new Chart(lineCtx, {
+  type: 'line',
+  data: {
+    labels: Array.from({length:24},(_,i)=>`${String(i).padStart(2,'0')}`),
+    datasets: [
+      { label:'Weekday', data:wdVol, borderColor:BLUE, backgroundColor:BLUE+'22', fill:true, tension:0.4, pointRadius:0, borderWidth:2 },
+      { label:'Weekend', data:weVol, borderColor:AMBER, backgroundColor:AMBER+'22', fill:true, tension:0.4, pointRadius:0, borderWidth:2, borderDash:[5,3] },
+    ]
+  },
+  options: {
+    responsive:true, maintainAspectRatio:false,
+    plugins:{ legend:{display:false} },
+    scales:{
+      x:{ticks:{color:TICK,font:{size:9},maxRotation:0,callback:(_,i)=>i%4===0?`${String(i).padStart(2,'0')}`:''}, grid:{color:GRID}},
+      y:{ticks:{color:TICK,font:{size:9},callback:v=>`${(v/1000).toFixed(1)}k`}, grid:{color:GRID}}
+    }
+  }
+});
+
+// ── Seasonal bar ──────────────────────────────────────────────────────────
+const seasonCtx = document.getElementById('seasonChart').getContext('2d');
+const hwVol = [3820,3750,3980,4210,4380,4520,4620,4590,4480,4350,4120,3890];
+const arVol = [1450,1420,1510,1640,1720,1790,1820,1810,1760,1700,1580,1490];
+
+new Chart(seasonCtx, {
+  type: 'bar',
+  data: {
+    labels:['J','F','M','A','M','J','J','A','S','O','N','D'],
+    datasets:[
+      { label:'Highway', data:hwVol, backgroundColor:BLUE+'cc', borderRadius:3 },
+      { label:'Arterial', data:arVol, backgroundColor:TEAL+'cc', borderRadius:3 },
+    ]
+  },
+  options:{
+    responsive:true, maintainAspectRatio:false,
+    plugins:{ legend:{display:false} },
+    scales:{
+      x:{ticks:{color:TICK,font:{size:9}}, grid:{color:GRID}},
+      y:{ticks:{color:TICK,font:{size:9},callback:v=>`${(v/1000).toFixed(1)}k`}, grid:{color:GRID}, stacked:false}
+    }
+  }
+});
+</script>
+</body>
+</html>
