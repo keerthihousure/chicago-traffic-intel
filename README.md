@@ -2,7 +2,9 @@
 
 > **End-to-end traffic analytics pipeline** — 500K+ Chicago open records · SQL · Python · Power BI · DAX
 
-https://keerthihousure.github.io/chicago-traffic-intel/powerbi_dashboard.html
+![Dashboard Preview](dashboard_screenshot.png)
+
+🔴 [View Live Interactive Dashboard](https://keerthihousure.github.io/chicago-traffic-intel/powerbi_dashboard.html)
 
 ---
 
