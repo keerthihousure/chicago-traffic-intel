@@ -232,7 +232,7 @@
   </div>
   <div class="header-right">
     <div class="badge">LIVE</div>
-    <div class="last-refresh">Last refresh: Dec 30, 2023 11:59 PM</div>
+<div class="last-refresh" id="refreshTime"></div>
   </div>
 </div>
 
@@ -538,6 +538,10 @@ new Chart(seasonCtx, {
     }
   }
 });
+
+document.getElementById("refreshTime").innerHTML =
+"Last refresh: " + new Date().toLocaleString();
+
 </script>
 </body>
 </html>
